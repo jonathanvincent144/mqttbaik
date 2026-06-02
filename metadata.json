@@ -1,0 +1,8 @@
+{
+  "name": "ESP32 Relay & DHT11 Controller",
+  "description": "Web interface to control 4 relays, read DHT11 sensors, use voice commands, and configure multiple MQTT brokers.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

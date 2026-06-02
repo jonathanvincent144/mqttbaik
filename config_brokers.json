@@ -1,0 +1,26 @@
+[
+  {
+    "server": "kingfisher.lmq.cloudamqp.com",
+    "port": 8883,
+    "user": "lziinrjb",
+    "pass": "NwNopYcfW7CU8oujNwvSH5HMcDO8toQj",
+    "client_id": "ESP32AMQP_Web",
+    "vhost": "lziinrjb"
+  },
+  {
+    "server": "main.mqtt.ably.net",
+    "port": 8883,
+    "user": "2Hz50g.IkSfbw",
+    "pass": "zwBzMos1xeBawVKWvWDlSbcxzijDa-jQViBMPWN7HRQ",
+    "client_id": "ESP32Ably_Web",
+    "vhost": null
+  },
+  {
+    "server": "pf-l6rvh5uuefqnek6dwyef.cedalo.cloud",
+    "port": 8883,
+    "user": "hebat2",
+    "pass": "a",
+    "client_id": "hebatwebclient2",
+    "vhost": null
+  }
+]
