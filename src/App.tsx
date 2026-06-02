@@ -22,41 +22,94 @@ export default function App() {
   const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
   const [reconnectCounter, setReconnectCounter] = useState<number>(0);
 
-  // Hook into Server-Sent Events (SSE) stream for instant server state updates
+  // Hook into state fetch and Server-Sent Events (SSE) stream with robust standard API polling fallback for Vercel
   useEffect(() => {
     let eventSource: EventSource;
+    let pollInterval: any;
+    let isSseActive = false;
+
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch("/api/status");
+        if (res.ok) {
+          const rawData = await res.json();
+          setStatus(rawData);
+          setIsBackendConnected(true);
+          return true;
+        }
+      } catch (err) {
+        console.error("Failed to fetch state via API:", err);
+      }
+      return false;
+    };
+
+    const startPolling = () => {
+      if (pollInterval) clearInterval(pollInterval);
+      pollInterval = setInterval(async () => {
+        if (!isSseActive) {
+          const success = await fetchStatus();
+          if (!success) {
+            setIsBackendConnected(false);
+          }
+        }
+      }, 2500);
+    };
 
     const connectSSE = () => {
       console.log("Connecting to API state stream...");
       eventSource = new EventSource("/api/stream");
+
+      eventSource.onopen = () => {
+        console.log("SSE Connection opened successfully. Suspending polling dynamic fallback.");
+        isSseActive = true;
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = null;
+        }
+      };
 
       eventSource.onmessage = (event) => {
         try {
           const rawData = JSON.parse(event.data);
           setStatus(rawData);
           setIsBackendConnected(true);
+          isSseActive = true;
         } catch (err) {
           console.error("Failed to parse SSE data:", err);
         }
       };
 
       eventSource.onerror = (err) => {
-        console.error("SSE stream error:", err);
+        console.error("SSE stream error (expected on serverless hosts like Vercel), starting HTTP fallback polling:", err);
+        isSseActive = false;
         setIsBackendConnected(false);
         eventSource.close();
         
-        // Retry connection after 5 seconds
+        // Activate standard polling right away as fallback
+        startPolling();
+        
+        // Retry SSE re-handshake after some delay
         setTimeout(() => {
           setReconnectCounter((prev) => prev + 1);
-        }, 5000);
+        }, 10000);
       };
     };
+
+    // Perform instant initial status update
+    fetchStatus().then((healthy) => {
+      if (!healthy) {
+        startPolling();
+      }
+    });
 
     connectSSE();
 
     return () => {
       if (eventSource) {
         eventSource.close();
+      }
+      if (pollInterval) {
+        clearInterval(pollInterval);
       }
     };
   }, [reconnectCounter]);
