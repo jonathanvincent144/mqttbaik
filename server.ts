@@ -56,6 +56,8 @@ let relayState: RelayState = {
 };
 
 let activeBrokerIndex = 0; // ESP32 reported active broker (default index 0)
+let lastUserBrokerSwitchTime = 0; // Timestamp of last user-requested broker change
+let desiredBrokerIndex = 0; // The broker index the user requested to switch to
 let logs: LogEntry[] = [];
 
 // SSE Clients list
@@ -228,8 +230,13 @@ function connectMqttClient(index: number) {
         const parts = cleanVal.substring(7).split("|");
         const idx = parseInt(parts[0], 10) - 1;
         if (idx >= 0 && idx < 3) {
-          activeBrokerIndex = idx;
-          addLog("info", `ESP32 melaporkan aktif di Broker ${idx + 1} (${parts[1] || ""})`, config.server);
+          const now = Date.now();
+          if (now - lastUserBrokerSwitchTime < 10000 && idx !== desiredBrokerIndex) {
+            console.log(`[MQTT] Ignored status/broker reporting broker ${idx + 1} because a switch to ${desiredBrokerIndex + 1} was requested recently.`);
+          } else {
+            activeBrokerIndex = idx;
+            addLog("info", `ESP32 melaporkan aktif di Broker ${idx + 1} (${parts[1] || ""})`, config.server);
+          }
         }
       }
     } else if (topic.startsWith("kontrol/relay")) {
@@ -333,6 +340,13 @@ async function startServer() {
       topic = "kontrol/broker";
       message = value; // "1", "2", "3"
       logMessage = `${source || "Web UI"} mengajukan pindah Broker ke => Broker ${value}`;
+      
+      const newIndex = parseInt(value, 10) - 1;
+      if (newIndex >= 0 && newIndex < 3) {
+        activeBrokerIndex = newIndex;
+        desiredBrokerIndex = newIndex;
+        lastUserBrokerSwitchTime = Date.now();
+      }
     } else {
       return res.status(400).json({ error: "Target tidak valid" });
     }
@@ -363,23 +377,21 @@ async function startServer() {
 
     brokerConfigs[index] = updatedConfig;
 
-    try {
-      await fs.writeFile(CONFIG_FILE_PATH, JSON.stringify(brokerConfigs, null, 2), "utf8");
-      addLog("success", `Konfigurasi Broker ${index + 1} berhasil diperbarui.`);
-      
-      // Reconnect this specific client
-      connectMqttClient(index);
-      
-      res.json({ success: true, configs: brokerConfigs });
-    } catch (err: any) {
-      console.error("Save config error (recovering in-memory only):", err);
-      addLog("warning", `Konfigurasi Broker ${index + 1} diperbarui di memori sementara (Gagal menulis file: ${err.message}).`);
-      
-      // Reconnect this specific client in-memory anyway
-      connectMqttClient(index);
-      
-      res.json({ success: true, configs: brokerConfigs });
-    }
+    // Persist to configuration file asynchronously in the background so API responds instantly
+    fs.writeFile(CONFIG_FILE_PATH, JSON.stringify(brokerConfigs, null, 2), "utf8")
+      .then(() => {
+        console.log(`[Config] Successfully persisted broker configurations to ${CONFIG_FILE_PATH}`);
+      })
+      .catch((writeErr: any) => {
+        console.warn(`[Config] Failed to persist configuration to file (possibly read-only filesystem):`, writeErr.message);
+      });
+
+    addLog("success", `Konfigurasi Broker ${index + 1} berhasil diperbarui.`);
+    
+    // Reconnect this specific client
+    connectMqttClient(index);
+    
+    res.json({ success: true, configs: brokerConfigs });
   });
 
   // API Route: Reset logs

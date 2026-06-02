@@ -260,6 +260,7 @@ export default function App() {
         const nextStatus = {
           ...prev,
           relayState: newRelayState,
+          activeBrokerIndex: target === "broker" ? parseInt(value, 10) - 1 : prev.activeBrokerIndex,
           logs: newLogs.slice(0, 100),
         };
 
