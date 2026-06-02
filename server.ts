@@ -10,7 +10,7 @@ import { BrokerConfig, RelayState, SensorData, LogEntry, AppStatus } from "./src
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const CONFIG_FILE_PATH = path.join(process.cwd(), "config_brokers.json");
 
 // Application state in memory
@@ -109,7 +109,11 @@ async function loadConfigurations() {
         vhost: null,
       },
     ];
-    await fs.writeFile(CONFIG_FILE_PATH, JSON.stringify(brokerConfigs, null, 2), "utf8");
+    try {
+      await fs.writeFile(CONFIG_FILE_PATH, JSON.stringify(brokerConfigs, null, 2), "utf8");
+    } catch (writeErr: any) {
+      console.warn("Failed to write default broker configs (possibly read-only filesystem):", writeErr.message);
+    }
   }
 }
 
@@ -349,8 +353,13 @@ async function startServer() {
       
       res.json({ success: true, configs: brokerConfigs });
     } catch (err: any) {
-      console.error("Save config error:", err);
-      res.status(500).json({ error: "Gagal menyimpan konfigurasi: " + err.message });
+      console.error("Save config error (recovering in-memory only):", err);
+      addLog("warning", `Konfigurasi Broker ${index + 1} diperbarui di memori sementara (Gagal menulis file: ${err.message}).`);
+      
+      // Reconnect this specific client in-memory anyway
+      connectMqttClient(index);
+      
+      res.json({ success: true, configs: brokerConfigs });
     }
   });
 
