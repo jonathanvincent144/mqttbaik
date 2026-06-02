@@ -6,9 +6,28 @@ import { createServer as createViteServer } from "vite";
 import { fileURLToPath } from "url";
 import { BrokerConfig, RelayState, SensorData, LogEntry, AppStatus } from "./src/types.js";
 
-// Setup ESM paths
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Setup safely
+const getDirname = () => {
+  try {
+    if (typeof import.meta !== "undefined" && import.meta.url) {
+      return path.dirname(fileURLToPath(import.meta.url));
+    }
+  } catch (e) {}
+  return typeof __dirname !== "undefined" ? __dirname : process.cwd();
+};
+
+const getFilename = () => {
+  try {
+    if (typeof import.meta !== "undefined" && import.meta.url) {
+      return fileURLToPath(import.meta.url);
+    }
+  } catch (e) {}
+  return typeof __filename !== "undefined" ? __filename : "";
+};
+
+const __filenameCustom = getFilename();
+const __dirnameCustom = getDirname();
+
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const CONFIG_FILE_PATH = path.join(process.cwd(), "config_brokers.json");
