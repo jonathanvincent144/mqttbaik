@@ -234,7 +234,6 @@ function connectMqttClient(index: number) {
           if (now - lastUserBrokerSwitchTime < 10000 && idx !== desiredBrokerIndex) {
             console.log(`[MQTT] Ignored status/broker reporting broker ${idx + 1} because a switch to ${desiredBrokerIndex + 1} was requested recently.`);
           } else {
-            activeBrokerIndex = idx;
             addLog("info", `ESP32 melaporkan aktif di Broker ${idx + 1} (${parts[1] || ""})`, config.server);
           }
         }
